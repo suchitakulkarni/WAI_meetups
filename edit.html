@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Your Submission</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -28,12 +27,7 @@
             max-width: 640px;
         }
 
-        .card-header {
-            margin-bottom: 2rem;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 1.5rem;
-        }
-
+        .card-header { margin-bottom: 2rem; border-bottom: 2px solid #f0f0f0; padding-bottom: 1.5rem; }
         .card-header h1 { font-size: 1.6rem; font-weight: 700; color: #111; }
         .card-header p  { margin-top: 0.4rem; color: #555; font-size: 0.95rem; }
 
@@ -48,7 +42,7 @@
         }
 
         label .required { color: #c0392b; margin-left: 2px; }
-        label .hint { font-weight: 400; color: #888; font-size: 0.82rem; margin-left: 4px; }
+        label .hint     { font-weight: 400; color: #888; font-size: 0.82rem; margin-left: 4px; }
 
         input[type="text"],
         input[type="email"],
@@ -65,17 +59,9 @@
             background: #fafafa;
         }
 
-        input:focus, textarea:focus {
-            outline: none;
-            border-color: #4f46e5;
-            background: white;
-        }
+        input:focus, textarea:focus { outline: none; border-color: #4f46e5; background: white; }
 
-        input[readonly] {
-            background: #f0f0f0;
-            color: #888;
-            cursor: not-allowed;
-        }
+        input[readonly] { background: #f0f0f0; color: #888; cursor: not-allowed; }
 
         textarea { resize: vertical; min-height: 100px; }
 
@@ -90,9 +76,10 @@
         }
 
         .photo-area:hover { border-color: #4f46e5; background: #f5f3ff; }
-        .photo-area input[type="file"] { display: none; }
-        .photo-area p { color: #888; font-size: 0.9rem; margin-top: 0.3rem; }
+        .photo-area input { display: none; }
         .photo-area .icon { font-size: 2rem; color: #bbb; }
+        .photo-area p     { color: #888; font-size: 0.9rem; margin-top: 0.3rem; }
+        .photo-area .note { font-size: 0.8rem; color: #aaa; margin-top: 0.4rem; }
 
         #photo-preview {
             width: 100px;
@@ -116,12 +103,7 @@
             gap: 0.6rem;
         }
 
-        .section-divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #eee;
-        }
+        .section-divider::after { content: ''; flex: 1; height: 1px; background: #eee; }
 
         button[type="submit"] {
             width: 100%;
@@ -151,18 +133,9 @@
         .message.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
         .message.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
 
-        #loading {
-            text-align: center;
-            padding: 3rem;
-            color: #888;
-        }
+        #loading { text-align: center; padding: 3rem; color: #888; }
 
-        #invalid-token {
-            text-align: center;
-            padding: 3rem;
-            display: none;
-        }
-
+        #invalid-token { text-align: center; padding: 3rem; display: none; }
         #invalid-token h2 { color: #991b1b; margin-bottom: 0.5rem; }
         #invalid-token p  { color: #666; font-size: 0.9rem; }
 
@@ -182,7 +155,7 @@
     <div id="edit-form">
         <div class="card-header">
             <h1>Edit Your Submission</h1>
-            <p>Update your details below and click Save. Your email address cannot be changed.</p>
+            <p>Update your details and click Save. Your email address cannot be changed.</p>
         </div>
 
         <form id="speaker-form">
@@ -219,6 +192,7 @@
                 <div class="photo-area" onclick="document.getElementById('photo-file').click()">
                     <div class="icon">&#128247;</div>
                     <p id="photo-label">Click to replace your photo</p>
+                    <p class="note">JPEG or PNG, max 2 MB. If larger please contact the organisers.</p>
                     <input type="file" id="photo-file" accept="image/jpeg,image/png" />
                     <img id="photo-preview" alt="Current photo" />
                 </div>
@@ -245,63 +219,43 @@
 
 <script>
     // ----------------------------------------------------------------
-    // CONFIG — replace with your actual values
+    // CONFIG
     // ----------------------------------------------------------------
-    const SUPABASE_URL  = 'https://supabase.com/dashboard/project/nxfhfobrrjqcsczlbkxv';
-    const SUPABASE_ANON = 'sb_publishable_C45561w1ziCfbR6UOQdnmA_KwmAj_eM';
+    const FUNCTION_URL = 'YOUR_SUPABASE_FUNCTION_URL';
     // ----------------------------------------------------------------
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-
-    // Extract token from URL: edit.html?token=<uuid>
-    const params = new URLSearchParams(window.location.search);
-    const token  = params.get('token');
-
-    let currentPhotoUrl = null;
+    const token     = new URLSearchParams(window.location.search).get('token');
+    let photoBase64 = null;
 
     async function loadRecord() {
-        if (!token) {
-            showInvalid();
-            return;
-        }
+        if (!token) { showInvalid(); return; }
 
-        const { data, error } = await sb
-            .from('speakers')
-            .select('*')
-            .eq('edit_token', token)
-            .single();
+        try {
+            const res  = await fetch(`${FUNCTION_URL}/record?token=${encodeURIComponent(token)}`);
+            const data = await res.json();
 
-        if (error || !data) {
-            showInvalid();
-            return;
-        }
+            if (!res.ok) { showInvalid(); return; }
 
-        // Populate form
-        document.getElementById('full_name').value    = data.full_name    || '';
-        document.getElementById('email').value        = data.email        || '';
-        document.getElementById('affiliation').value  = data.affiliation  || '';
-        document.getElementById('bio').value          = data.bio          || '';
-        document.getElementById('social_link').value  = data.social_link  || '';
-        document.getElementById('talk_title').value   = data.talk_title   || '';
-        document.getElementById('talk_abstract').value= data.talk_abstract|| '';
+            document.getElementById('full_name').value     = data.full_name     || '';
+            document.getElementById('email').value         = data.email         || '';
+            document.getElementById('affiliation').value   = data.affiliation   || '';
+            document.getElementById('bio').value           = data.bio           || '';
+            document.getElementById('social_link').value   = data.social_link   || '';
+            document.getElementById('talk_title').value    = data.talk_title    || '';
+            document.getElementById('talk_abstract').value = data.talk_abstract || '';
 
-        currentPhotoUrl = data.photo_url;
-
-        // Load existing photo preview
-        if (data.photo_url) {
-            const { data: signedData } = await sb.storage
-                .from('speaker-photos')
-                .createSignedUrl(data.photo_url, 3600);
-            if (signedData) {
+            if (data.photo_url) {
                 const preview = document.getElementById('photo-preview');
-                preview.src = signedData.signedUrl;
+                preview.src = data.photo_url;
                 preview.style.display = 'block';
-                document.getElementById('photo-label').textContent = 'Click to replace your photo';
             }
-        }
 
-        document.getElementById('loading').style.display   = 'none';
-        document.getElementById('edit-form').style.display = 'block';
+            document.getElementById('loading').style.display   = 'none';
+            document.getElementById('edit-form').style.display = 'block';
+
+        } catch {
+            showInvalid();
+        }
     }
 
     function showInvalid() {
@@ -309,73 +263,74 @@
         document.getElementById('invalid-token').style.display = 'block';
     }
 
-    // Photo preview on new file select
     document.getElementById('photo-file').addEventListener('change', function () {
         const file = this.files[0];
         if (!file) return;
-        const preview = document.getElementById('photo-preview');
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-        document.getElementById('photo-label').textContent = file.name;
+
+        const msg = document.getElementById('form-message');
+
+        if (file.size > 2 * 1024 * 1024) {
+            msg.className     = 'message error';
+            msg.textContent   = 'Photo exceeds 2 MB. Please contact the organisers to submit your photo directly.';
+            msg.style.display = 'block';
+            this.value  = '';
+            photoBase64 = null;
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoBase64 = e.target.result;
+            const preview = document.getElementById('photo-preview');
+            preview.src = photoBase64;
+            preview.style.display = 'block';
+            document.getElementById('photo-label').textContent = file.name;
+            msg.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
     });
 
-    // Save changes
     document.getElementById('speaker-form').addEventListener('submit', async function (e) {
         e.preventDefault();
 
         const btn = document.getElementById('save-btn');
         const msg = document.getElementById('form-message');
-        btn.disabled = true;
+        btn.disabled    = true;
         btn.textContent = 'Saving...';
         msg.style.display = 'none';
 
         try {
-            const full_name     = document.getElementById('full_name').value.trim();
-            const affiliation   = document.getElementById('affiliation').value.trim();
-            const bio           = document.getElementById('bio').value.trim();
-            const social_link   = document.getElementById('social_link').value.trim();
-            const talk_title    = document.getElementById('talk_title').value.trim();
-            const talk_abstract = document.getElementById('talk_abstract').value.trim();
-            const photoFile     = document.getElementById('photo-file').files[0];
+            const payload = {
+                token,
+                full_name:     document.getElementById('full_name').value.trim(),
+                affiliation:   document.getElementById('affiliation').value.trim(),
+                bio:           document.getElementById('bio').value.trim(),
+                social_link:   document.getElementById('social_link').value.trim(),
+                talk_title:    document.getElementById('talk_title').value.trim(),
+                talk_abstract: document.getElementById('talk_abstract').value.trim(),
+                photo:         photoBase64
+            };
 
-            let photo_url = '';
-
-            if (photoFile) {
-                if (photoFile.size > 5 * 1024 * 1024) throw new Error('Photo must be under 5 MB.');
-                const email   = document.getElementById('email').value.trim().toLowerCase();
-                const ext     = photoFile.name.split('.').pop();
-                const fileName= `${email.replace(/[^a-z0-9]/g, '_')}_${Date.now()}.${ext}`;
-                const { error: uploadError } = await sb.storage
-                    .from('speaker-photos')
-                    .upload(fileName, photoFile, { upsert: true });
-                if (uploadError) throw new Error('Photo upload failed: ' + uploadError.message);
-                photo_url = fileName;
-            }
-
-            const { data, error } = await sb.rpc('update_speaker_by_token', {
-                p_token:         token,
-                p_full_name:     full_name,
-                p_affiliation:   affiliation,
-                p_bio:           bio,
-                p_social_link:   social_link,
-                p_talk_title:    talk_title,
-                p_talk_abstract: talk_abstract,
-                p_photo_url:     photo_url
+            const res  = await fetch(`${FUNCTION_URL}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
 
-            if (error) throw new Error(error.message);
-            if (!data || data.length === 0) throw new Error('Update failed — invalid token.');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Update failed. Please try again.');
 
-            msg.className = 'message success';
-            msg.textContent = 'Your submission has been updated successfully.';
+            msg.className     = 'message success';
+            msg.textContent   = 'Your submission has been updated successfully.';
             msg.style.display = 'block';
+            photoBase64 = null;
 
         } catch (err) {
-            msg.className = 'message error';
-            msg.textContent = err.message;
+            msg.className     = 'message error';
+            msg.textContent   = err.message;
             msg.style.display = 'block';
         } finally {
-            btn.disabled = false;
+            btn.disabled    = false;
             btn.textContent = 'Save changes';
         }
     });
