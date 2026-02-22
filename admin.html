@@ -15,7 +15,7 @@
             min-height: 100vh;
         }
 
-        /* Login */
+        /* Login and set-password pages */
         #login-page {
             display: flex;
             align-items: center;
@@ -88,6 +88,17 @@
             display: none;
         }
 
+        .success-msg {
+            margin-top: 1rem;
+            padding: 0.8rem 1rem;
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 7px;
+            color: #166534;
+            font-size: 0.9rem;
+            display: none;
+        }
+
         /* Admin app */
         #admin-app { display: none; }
 
@@ -105,7 +116,6 @@
         }
 
         .topbar h1 { font-size: 1.1rem; font-weight: 700; }
-
         .topbar-right { display: flex; align-items: center; gap: 1rem; font-size: 0.88rem; color: #666; }
 
         .btn-logout {
@@ -359,8 +369,11 @@
 </head>
 <body>
 
+<!-- Login / set-password page -->
 <div id="login-page">
-    <div class="login-card">
+
+    <!-- Normal login form -->
+    <div id="login-card" class="login-card">
         <h1>Organiser Login</h1>
         <p>Sign in with your organiser credentials.</p>
         <div class="form-group">
@@ -374,8 +387,23 @@
         <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign in</button>
         <div class="error-msg" id="login-error"></div>
     </div>
+
+    <!-- Set password form — shown when arriving via invite or reset link -->
+    <div id="set-password-card" class="login-card" style="display:none;">
+        <h1>Set your password</h1>
+        <p>Choose a password for your organiser account. You will use this to log in from now on.</p>
+        <div class="form-group">
+            <label>New password <span style="font-weight:400;color:#888;font-size:0.82rem;">(min 6 characters)</span></label>
+            <input type="password" id="new-password" placeholder="Choose a password" />
+        </div>
+        <button class="btn-primary" id="set-password-btn" onclick="doSetPassword()">Set password and continue</button>
+        <div class="error-msg"    id="set-password-error"></div>
+        <div class="success-msg"  id="set-password-success"></div>
+    </div>
+
 </div>
 
+<!-- Admin app (shown after login) -->
 <div id="admin-app">
     <div class="topbar">
         <h1>Speaker Admin</h1>
@@ -468,7 +496,7 @@
 
 <script>
     // ----------------------------------------------------------------
-    // CONFIG — Supabase client only for auth. Data goes via Edge Function.
+    // CONFIG
     // ----------------------------------------------------------------
     const SUPABASE_URL  = 'https://nxfhfobrrjqcsczlbkxv.supabase.co';
     const SUPABASE_ANON = 'sb_publishable_C45561w1ziCfbR6UOQdnmA_KwmAj_eM';
@@ -481,12 +509,72 @@
     let currentSpeaker = null;
     let sessionToken   = null;
 
-    // --- Auth ---
+    // ----------------------------------------------------------------
+    // Auth state — handles login, invite, and password reset flows
+    // ----------------------------------------------------------------
+    sb.auth.onAuthStateChange(async (event, session) => {
+
+        if (event === 'SIGNED_IN' && session) {
+            // Check if this sign-in came from an invite or recovery link
+            // In that case we need them to set a real password first
+            const hash = window.location.hash;
+            const isInvite   = hash.includes('type=invite');
+            const isRecovery = hash.includes('type=recovery');
+
+            if (isInvite || isRecovery) {
+                // Show set-password form, do not show admin yet
+                showSetPasswordForm();
+                return;
+            }
+
+            // Normal login — show admin
+            sessionToken = session.access_token;
+            showAdminApp(session.user.email);
+        }
+
+        if (event === 'USER_UPDATED' && session) {
+            // Password was just set — now show the admin app
+            sessionToken = session.access_token;
+            window.location.hash = '';
+            showAdminApp(session.user.email);
+        }
+
+        if (event === 'SIGNED_OUT') {
+            sessionToken = null;
+            showLoginForm();
+        }
+    });
+
+    function showLoginForm() {
+        document.getElementById('login-page').style.display        = 'flex';
+        document.getElementById('login-card').style.display        = 'block';
+        document.getElementById('set-password-card').style.display = 'none';
+        document.getElementById('admin-app').style.display         = 'none';
+    }
+
+    function showSetPasswordForm() {
+        document.getElementById('login-page').style.display        = 'flex';
+        document.getElementById('login-card').style.display        = 'none';
+        document.getElementById('set-password-card').style.display = 'block';
+        document.getElementById('admin-app').style.display         = 'none';
+    }
+
+    function showAdminApp(email) {
+        document.getElementById('login-page').style.display  = 'none';
+        document.getElementById('admin-app').style.display   = 'block';
+        document.getElementById('user-email-display').textContent = email;
+        loadSpeakers();
+    }
+
+    // ----------------------------------------------------------------
+    // Login
+    // ----------------------------------------------------------------
     async function doLogin() {
         const email    = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value;
         const btn      = document.getElementById('login-btn');
         const errEl    = document.getElementById('login-error');
+
         btn.disabled    = true;
         btn.textContent = 'Signing in...';
         errEl.style.display = 'none';
@@ -508,21 +596,48 @@
         await sb.auth.signOut();
     }
 
-    sb.auth.onAuthStateChange((event, session) => {
-        if (session) {
-            sessionToken = session.access_token;
-            document.getElementById('login-page').style.display  = 'none';
-            document.getElementById('admin-app').style.display   = 'block';
-            document.getElementById('user-email-display').textContent = session.user.email;
-            loadSpeakers();
-        } else {
-            sessionToken = null;
-            document.getElementById('login-page').style.display  = 'flex';
-            document.getElementById('admin-app').style.display   = 'none';
+    // ----------------------------------------------------------------
+    // Set password (invite / reset flow)
+    // ----------------------------------------------------------------
+    async function doSetPassword() {
+        const password = document.getElementById('new-password').value;
+        const btn      = document.getElementById('set-password-btn');
+        const errEl    = document.getElementById('set-password-error');
+        const sucEl    = document.getElementById('set-password-success');
+
+        errEl.style.display = 'none';
+        sucEl.style.display = 'none';
+
+        if (!password || password.length < 6) {
+            errEl.textContent   = 'Password must be at least 6 characters.';
+            errEl.style.display = 'block';
+            return;
         }
+
+        btn.disabled    = true;
+        btn.textContent = 'Setting password...';
+
+        const { error } = await sb.auth.updateUser({ password });
+
+        if (error) {
+            errEl.textContent   = error.message;
+            errEl.style.display = 'block';
+            btn.disabled        = false;
+            btn.textContent     = 'Set password and continue';
+        } else {
+            sucEl.textContent   = 'Password set. Taking you to the admin panel...';
+            sucEl.style.display = 'block';
+            // USER_UPDATED event will fire and call showAdminApp
+        }
+    }
+
+    document.getElementById('new-password').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doSetPassword();
     });
 
-    // --- Load speakers via Edge Function ---
+    // ----------------------------------------------------------------
+    // Load speakers
+    // ----------------------------------------------------------------
     async function loadSpeakers() {
         const container = document.getElementById('speakers-container');
         container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
@@ -563,10 +678,12 @@
         const grid = document.getElementById('speakers-grid');
 
         for (const s of allSpeakers) {
-            const card      = document.createElement('div');
-            card.className  = 'speaker-card';
-            card.onclick    = () => openModal(s);
-            const submitted = new Date(s.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const card     = document.createElement('div');
+            card.className = 'speaker-card';
+            card.onclick   = () => openModal(s);
+            const submitted = new Date(s.created_at).toLocaleDateString('en-GB', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
 
             card.innerHTML = `
                 <div class="speaker-card-body">
@@ -585,17 +702,20 @@
         }
     }
 
+    // ----------------------------------------------------------------
+    // Modal
+    // ----------------------------------------------------------------
     function openModal(speaker) {
         currentSpeaker = speaker;
 
-        document.getElementById('m-photo').src           = speaker.photo_url || BLANK_AVATAR;
-        document.getElementById('m-name').textContent    = speaker.full_name;
-        document.getElementById('m-meta').textContent    = [speaker.affiliation, speaker.email].filter(Boolean).join(' | ');
-        document.getElementById('m-bio').textContent     = speaker.bio || 'Not provided.';
+        document.getElementById('m-photo').src              = speaker.photo_url || BLANK_AVATAR;
+        document.getElementById('m-name').textContent       = speaker.full_name;
+        document.getElementById('m-meta').textContent       = [speaker.affiliation, speaker.email].filter(Boolean).join(' | ');
+        document.getElementById('m-bio').textContent        = speaker.bio || 'Not provided.';
         document.getElementById('m-talk-title').textContent = speaker.talk_title;
         document.getElementById('m-abstract').textContent   = speaker.talk_abstract || 'Not provided.';
-        document.getElementById('m-email').innerHTML     = `<a class="detail-link" href="mailto:${esc(speaker.email)}">${esc(speaker.email)}</a>`;
-        document.getElementById('m-status-select').value = speaker.status;
+        document.getElementById('m-email').innerHTML        = `<a class="detail-link" href="mailto:${esc(speaker.email)}">${esc(speaker.email)}</a>`;
+        document.getElementById('m-status-select').value   = speaker.status;
 
         const socialEl = document.getElementById('m-social');
         socialEl.innerHTML = speaker.social_link
@@ -645,6 +765,9 @@
         closeModal();
     }
 
+    // ----------------------------------------------------------------
+    // Utility
+    // ----------------------------------------------------------------
     function esc(str) {
         return String(str || '')
             .replace(/&/g, '&amp;')
