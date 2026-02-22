@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speaker Submission</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 640px;
+        }
+
+        .card-header {
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 1.5rem;
+        }
+
+        .card-header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #111;
+        }
+
+        .card-header p {
+            margin-top: 0.4rem;
+            color: #555;
+            font-size: 0.95rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.4rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+            color: #333;
+        }
+
+        label .required {
+            color: #c0392b;
+            margin-left: 2px;
+        }
+
+        label .hint {
+            font-weight: 400;
+            color: #888;
+            font-size: 0.82rem;
+            margin-left: 4px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="url"],
+        textarea {
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border: 1.5px solid #ddd;
+            border-radius: 7px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: #1a1a1a;
+            transition: border-color 0.2s;
+            background: #fafafa;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background: white;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .photo-area {
+            border: 2px dashed #ddd;
+            border-radius: 7px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            background: #fafafa;
+        }
+
+        .photo-area:hover {
+            border-color: #4f46e5;
+            background: #f5f3ff;
+        }
+
+        .photo-area input[type="file"] {
+            display: none;
+        }
+
+        .photo-area p {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+
+        .photo-area .icon {
+            font-size: 2rem;
+            color: #bbb;
+        }
+
+        #photo-preview {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 0.8rem auto 0;
+            display: none;
+            border: 2px solid #e0e0e0;
+        }
+
+        .section-divider {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #888;
+            margin: 2rem 0 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .section-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #eee;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 0.85rem;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button[type="submit"]:hover { background: #4338ca; }
+        button[type="submit"]:active { transform: scale(0.99); }
+        button[type="submit"]:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+        .message {
+            margin-top: 1.2rem;
+            padding: 1rem 1.2rem;
+            border-radius: 7px;
+            font-size: 0.95rem;
+            display: none;
+        }
+
+        .message.success {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+        }
+
+        .message.error {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+
+        /* Password gate */
+        #password-gate {
+            text-align: center;
+        }
+
+        #password-gate h2 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #password-gate p {
+            color: #666;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        #password-gate input {
+            max-width: 300px;
+            margin: 0 auto 1rem;
+        }
+
+        #password-gate button {
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        #form-content { display: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+
+    <!-- Password gate -->
+    <div id="password-gate">
+        <div class="card-header">
+            <h1>Speaker Submission</h1>
+            <p>This form is restricted. Please enter the access password to continue.</p>
+        </div>
+        <div class="form-group">
+            <input type="password" id="gate-password" placeholder="Enter password" />
+        </div>
+        <button type="button" onclick="checkPassword()">Continue</button>
+        <div id="gate-error" class="message error"></div>
+    </div>
+
+    <!-- Actual form (hidden until password accepted) -->
+    <div id="form-content">
+        <div class="card-header">
+            <h1>Speaker Submission</h1>
+            <p>Fill in your details below. After submitting you will receive an email with a private link to edit your entry at any time.</p>
+        </div>
+
+        <form id="speaker-form">
+
+            <div class="section-divider">Personal details</div>
+
+            <div class="form-group">
+                <label>Full name <span class="required">*</span></label>
+                <input type="text" id="full_name" required placeholder="Dr. Jane Smith" />
+            </div>
+
+            <div class="form-group">
+                <label>Email address <span class="required">*</span></label>
+                <input type="email" id="email" required placeholder="jane@institute.org" />
+            </div>
+
+            <div class="form-group">
+                <label>Affiliation <span class="hint">(institution or company)</span></label>
+                <input type="text" id="affiliation" placeholder="CERN / University of Geneva" />
+            </div>
+
+            <div class="form-group">
+                <label>Short bio <span class="hint">(2-4 sentences)</span></label>
+                <textarea id="bio" rows="4" placeholder="Brief description of your research background and interests..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>LinkedIn or homepage URL</label>
+                <input type="url" id="social_link" placeholder="https://linkedin.com/in/yourprofile" />
+            </div>
+
+            <div class="form-group">
+                <label>Photo <span class="hint">(JPG or PNG, max 5 MB)</span></label>
+                <div class="photo-area" onclick="document.getElementById('photo-file').click()">
+                    <div class="icon">&#128247;</div>
+                    <p id="photo-label">Click to upload a photo</p>
+                    <input type="file" id="photo-file" accept="image/jpeg,image/png" />
+                    <img id="photo-preview" alt="Preview" />
+                </div>
+            </div>
+
+            <div class="section-divider">Talk details</div>
+
+            <div class="form-group">
+                <label>Talk title <span class="required">*</span></label>
+                <input type="text" id="talk_title" required placeholder="Searching for dark matter with the XYZ detector" />
+            </div>
+
+            <div class="form-group">
+                <label>Abstract <span class="hint">(plain text, ~150-300 words)</span></label>
+                <textarea id="talk_abstract" rows="6" placeholder="Describe your talk..."></textarea>
+            </div>
+
+            <button type="submit" id="submit-btn">Submit</button>
+            <div id="form-message" class="message"></div>
+
+        </form>
+    </div>
+</div>
+
+<script>
+    // ----------------------------------------------------------------
+    // CONFIG — replace these with your actual Supabase project values
+    // ----------------------------------------------------------------
+    const SUPABASE_URL  = 'https://supabase.com/dashboard/project/nxfhfobrrjqcsczlbkxv';
+    const SUPABASE_ANON = 'sb_publishable_C45561w1ziCfbR6UOQdnmA_KwmAj_eM';
+    const FORM_PASSWORD = 'meetup_details'; // keep this simple, share with speakers
+    // ----------------------------------------------------------------
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    // --- Password gate ---
+    function checkPassword() {
+        const val = document.getElementById('gate-password').value;
+        const err = document.getElementById('gate-error');
+        if (val === FORM_PASSWORD) {
+            document.getElementById('password-gate').style.display = 'none';
+            document.getElementById('form-content').style.display  = 'block';
+        } else {
+            err.textContent = 'Incorrect password. Please try again.';
+            err.style.display = 'block';
+        }
+    }
+
+    document.getElementById('gate-password').addEventListener('keydown', e => {
+        if (e.key === 'Enter') checkPassword();
+    });
+
+    // --- Photo preview ---
+    document.getElementById('photo-file').addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+        const preview = document.getElementById('photo-preview');
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        document.getElementById('photo-label').textContent = file.name;
+    });
+
+    // --- Form submission ---
+    document.getElementById('speaker-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('submit-btn');
+        const msg = document.getElementById('form-message');
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+        msg.style.display = 'none';
+
+        try {
+            const email      = document.getElementById('email').value.trim().toLowerCase();
+            const full_name  = document.getElementById('full_name').value.trim();
+            const affiliation= document.getElementById('affiliation').value.trim();
+            const bio        = document.getElementById('bio').value.trim();
+            const social_link= document.getElementById('social_link').value.trim();
+            const talk_title = document.getElementById('talk_title').value.trim();
+            const talk_abstract = document.getElementById('talk_abstract').value.trim();
+            const photoFile  = document.getElementById('photo-file').files[0];
+
+            // Upload photo if provided
+            let photo_url = null;
+            if (photoFile) {
+                if (photoFile.size > 5 * 1024 * 1024) {
+                    throw new Error('Photo must be under 5 MB.');
+                }
+                const ext      = photoFile.name.split('.').pop();
+                const fileName = `${email.replace(/[^a-z0-9]/g, '_')}_${Date.now()}.${ext}`;
+                const { error: uploadError } = await sb.storage
+                    .from('speaker-photos')
+                    .upload(fileName, photoFile, { upsert: true });
+                if (uploadError) throw new Error('Photo upload failed: ' + uploadError.message);
+                photo_url = fileName;
+            }
+
+            // Insert record
+            const { error: insertError } = await sb.from('speakers').insert({
+                email, full_name, affiliation, bio, social_link,
+                talk_title, talk_abstract, photo_url
+            });
+
+            if (insertError) {
+                if (insertError.code === '23505') {
+                    throw new Error('This email address has already been submitted. Use your edit link to update your entry.');
+                }
+                throw new Error(insertError.message);
+            }
+
+            // Trigger edge function to send email with edit link
+            await sb.functions.invoke('send-edit-link', { body: { email, full_name } });
+
+            msg.className = 'message success';
+            msg.textContent = 'Submission received. Check your email for a private link to edit your entry.';
+            msg.style.display = 'block';
+            document.getElementById('speaker-form').reset();
+            document.getElementById('photo-preview').style.display = 'none';
+            document.getElementById('photo-label').textContent = 'Click to upload a photo';
+
+        } catch (err) {
+            msg.className = 'message error';
+            msg.textContent = err.message;
+            msg.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Submit';
+        }
+    });
+</script>
+</body>
+</html>

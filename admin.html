@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organiser Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a1a;
+            min-height: 100vh;
+        }
+
+        /* Login page */
+        #login-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-card h1 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+        .login-card p  { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+        .form-group { margin-bottom: 1.2rem; }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.88rem;
+            margin-bottom: 0.35rem;
+            color: #444;
+        }
+
+        input[type="email"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border: 1.5px solid #ddd;
+            border-radius: 7px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: #fafafa;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background: white;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 0.8rem;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover    { background: #4338ca; }
+        .btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+        .error-msg {
+            margin-top: 1rem;
+            padding: 0.8rem 1rem;
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            border-radius: 7px;
+            color: #991b1b;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        /* Admin app */
+        #admin-app { display: none; }
+
+        .topbar {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0 2rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.88rem;
+            color: #666;
+        }
+
+        .btn-logout {
+            padding: 0.4rem 0.9rem;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-logout:hover { background: #e5e7eb; }
+
+        .main-content { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+
+        .stats-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.2rem 1.5rem;
+            flex: 1;
+            min-width: 140px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4f46e5;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.82rem;
+            color: #888;
+            margin-top: 0.2rem;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+        }
+
+        .toolbar h2 { font-size: 1.1rem; font-weight: 600; }
+
+        .btn-refresh {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1.5px solid #e5e7eb;
+            border-radius: 7px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .btn-refresh:hover { border-color: #4f46e5; color: #4f46e5; }
+
+        /* Speakers grid */
+        .speakers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.2rem;
+        }
+
+        .speaker-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .speaker-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+
+        .speaker-card-body {
+            padding: 1.3rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .speaker-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
+            flex-shrink: 0;
+            background: #f0f2f5;
+        }
+
+        .speaker-info { flex: 1; min-width: 0; }
+
+        .speaker-name {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #111;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .speaker-affiliation {
+            font-size: 0.82rem;
+            color: #888;
+            margin-top: 0.1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .speaker-talk {
+            font-size: 0.88rem;
+            color: #444;
+            margin-top: 0.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .speaker-card-footer {
+            padding: 0.7rem 1.3rem;
+            border-top: 1px solid #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.2rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-submitted { background: #eff6ff; color: #1d4ed8; }
+        .status-confirmed { background: #f0fdf4; color: #166534; }
+        .status-rejected  { background: #fef2f2; color: #991b1b; }
+        .status-pending   { background: #fffbeb; color: #92400e; }
+
+        .submitted-date {
+            font-size: 0.78rem;
+            color: #aaa;
+        }
+
+        /* Detail modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 100;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 2rem 1rem;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 640px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+            animation: slide-in 0.2s ease;
+        }
+
+        @keyframes slide-in {
+            from { opacity: 0; transform: translateY(-12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header {
+            padding: 1.5rem 1.5rem 1rem;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .modal-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
+            flex-shrink: 0;
+            background: #f0f2f5;
+        }
+
+        .modal-header-info { flex: 1; }
+
+        .modal-name { font-size: 1.25rem; font-weight: 700; }
+
+        .modal-meta {
+            font-size: 0.88rem;
+            color: #666;
+            margin-top: 0.2rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            color: #aaa;
+            padding: 0.2rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover { color: #333; }
+
+        .modal-body { padding: 1.5rem; }
+
+        .detail-section { margin-bottom: 1.5rem; }
+
+        .detail-section h3 {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #aaa;
+            margin-bottom: 0.5rem;
+        }
+
+        .detail-section p {
+            font-size: 0.93rem;
+            color: #333;
+            line-height: 1.55;
+        }
+
+        .detail-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .detail-link:hover { text-decoration: underline; }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+        }
+
+        .status-select-wrap { display: flex; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
+
+        .status-select-wrap label { font-weight: 600; color: #555; margin: 0; }
+
+        select.status-select {
+            padding: 0.4rem 0.7rem;
+            font-size: 0.88rem;
+            border: 1.5px solid #ddd;
+            border-radius: 6px;
+            width: auto;
+        }
+
+        .btn-save-status {
+            padding: 0.45rem 1.1rem;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-save-status:hover { background: #4338ca; }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #aaa;
+        }
+
+        .empty-state p { margin-top: 0.5rem; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-page">
+    <div class="login-card">
+        <h1>Organiser Login</h1>
+        <p>Sign in with your organiser credentials.</p>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="login-email" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="Password" />
+        </div>
+        <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign in</button>
+        <div class="error-msg" id="login-error"></div>
+    </div>
+</div>
+
+<!-- Admin app -->
+<div id="admin-app">
+    <div class="topbar">
+        <h1>Speaker Admin</h1>
+        <div class="topbar-right">
+            <span id="user-email-display"></span>
+            <button class="btn-logout" onclick="doLogout()">Sign out</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">-</div>
+                <div class="stat-label">Total submissions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-confirmed">-</div>
+                <div class="stat-label">Confirmed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-submitted">-</div>
+                <div class="stat-label">Awaiting review</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-rejected">-</div>
+                <div class="stat-label">Rejected</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <h2>Submissions</h2>
+            <button class="btn-refresh" onclick="loadSpeakers()">Refresh</button>
+        </div>
+
+        <div id="speakers-container">
+            <div class="empty-state">
+                <p>Loading submissions...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event)">
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <img class="modal-avatar" id="m-photo" src="" alt="" />
+            <div class="modal-header-info">
+                <div class="modal-name" id="m-name"></div>
+                <div class="modal-meta" id="m-meta"></div>
+            </div>
+            <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-section">
+                <h3>Bio</h3>
+                <p id="m-bio"></p>
+            </div>
+            <div class="detail-section">
+                <h3>Talk title</h3>
+                <p id="m-talk-title"></p>
+            </div>
+            <div class="detail-section">
+                <h3>Abstract</h3>
+                <p id="m-abstract"></p>
+            </div>
+            <div class="detail-section">
+                <h3>Contact &amp; links</h3>
+                <p id="m-email"></p>
+                <p id="m-social" style="margin-top:0.3rem;"></p>
+            </div>
+            <div class="detail-section">
+                <h3>Submitted</h3>
+                <p id="m-dates"></p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div class="status-select-wrap">
+                <label>Status</label>
+                <select class="status-select" id="m-status-select">
+                    <option value="submitted">Submitted</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="pending">Pending</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <button class="btn-save-status" onclick="saveStatus()">Save</button>
+            </div>
+            <span id="m-trello-link"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ----------------------------------------------------------------
+    // CONFIG
+    // ----------------------------------------------------------------
+    const SUPABASE_URL  = 'https://supabase.com/dashboard/project/nxfhfobrrjqcsczlbkxv';
+    const SUPABASE_ANON = 'sb_publishable_C45561w1ziCfbR6UOQdnmA_KwmAj_eM';
+    // ----------------------------------------------------------------
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    let allSpeakers  = [];
+    let currentSpeaker = null;
+
+    // --- Auth ---
+    async function doLogin() {
+        const email    = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        const btn      = document.getElementById('login-btn');
+        const errEl    = document.getElementById('login-error');
+        btn.disabled   = true;
+        btn.textContent= 'Signing in...';
+        errEl.style.display = 'none';
+
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) {
+            errEl.textContent   = error.message;
+            errEl.style.display = 'block';
+            btn.disabled        = false;
+            btn.textContent     = 'Sign in';
+        }
+    }
+
+    document.getElementById('login-password').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
+    });
+
+    async function doLogout() {
+        await sb.auth.signOut();
+    }
+
+    sb.auth.onAuthStateChange((event, session) => {
+        if (session) {
+            document.getElementById('login-page').style.display  = 'none';
+            document.getElementById('admin-app').style.display   = 'block';
+            document.getElementById('user-email-display').textContent = session.user.email;
+            loadSpeakers();
+        } else {
+            document.getElementById('login-page').style.display  = 'flex';
+            document.getElementById('admin-app').style.display   = 'none';
+        }
+    });
+
+    // --- Load speakers ---
+    async function loadSpeakers() {
+        const container = document.getElementById('speakers-container');
+        container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+
+        const { data, error } = await sb
+            .from('speakers')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            container.innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+            return;
+        }
+
+        allSpeakers = data || [];
+        updateStats();
+        renderCards();
+    }
+
+    function updateStats() {
+        document.getElementById('stat-total').textContent     = allSpeakers.length;
+        document.getElementById('stat-confirmed').textContent = allSpeakers.filter(s => s.status === 'confirmed').length;
+        document.getElementById('stat-submitted').textContent = allSpeakers.filter(s => s.status === 'submitted').length;
+        document.getElementById('stat-rejected').textContent  = allSpeakers.filter(s => s.status === 'rejected').length;
+    }
+
+    async function getPhotoUrl(path) {
+        if (!path) return null;
+        const { data } = await sb.storage
+            .from('speaker-photos')
+            .createSignedUrl(path, 3600);
+        return data ? data.signedUrl : null;
+    }
+
+    async function renderCards() {
+        const container = document.getElementById('speakers-container');
+
+        if (allSpeakers.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No submissions yet.</p></div>';
+            return;
+        }
+
+        container.innerHTML = '<div class="speakers-grid" id="speakers-grid"></div>';
+        const grid = document.getElementById('speakers-grid');
+
+        for (const s of allSpeakers) {
+            const photoUrl = await getPhotoUrl(s.photo_url);
+            const card = document.createElement('div');
+            card.className = 'speaker-card';
+            card.onclick = () => openModal(s);
+
+            const avatarSrc = photoUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Ccircle cx=\'20\' cy=\'20\' r=\'20\' fill=\'%23e5e7eb\'/%3E%3Ccircle cx=\'20\' cy=\'15\' r=\'7\' fill=\'%23aaa\'/%3E%3Cellipse cx=\'20\' cy=\'35\' rx=\'13\' ry=\'9\' fill=\'%23aaa\'/%3E%3C/svg%3E';
+            const submitted = new Date(s.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            card.innerHTML = `
+                <div class="speaker-card-body">
+                    <img class="speaker-avatar" src="${avatarSrc}" alt="${s.full_name}" />
+                    <div class="speaker-info">
+                        <div class="speaker-name">${escHtml(s.full_name)}</div>
+                        <div class="speaker-affiliation">${escHtml(s.affiliation || '')}</div>
+                        <div class="speaker-talk">${escHtml(s.talk_title)}</div>
+                    </div>
+                </div>
+                <div class="speaker-card-footer">
+                    <span class="status-badge status-${s.status}">${s.status}</span>
+                    <span class="submitted-date">${submitted}</span>
+                </div>`;
+            grid.appendChild(card);
+        }
+    }
+
+    // --- Modal ---
+    async function openModal(speaker) {
+        currentSpeaker = speaker;
+
+        const photoUrl = await getPhotoUrl(speaker.photo_url);
+        const avatarSrc = photoUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Ccircle cx=\'20\' cy=\'20\' r=\'20\' fill=\'%23e5e7eb\'/%3E%3Ccircle cx=\'20\' cy=\'15\' r=\'7\' fill=\'%23aaa\'/%3E%3Cellipse cx=\'20\' cy=\'35\' rx=\'13\' ry=\'9\' fill=\'%23aaa\'/%3E%3C/svg%3E';
+
+        document.getElementById('m-photo').src  = avatarSrc;
+        document.getElementById('m-name').textContent  = speaker.full_name;
+        document.getElementById('m-meta').textContent  = [speaker.affiliation, speaker.email].filter(Boolean).join(' | ');
+        document.getElementById('m-bio').textContent   = speaker.bio || 'Not provided.';
+        document.getElementById('m-talk-title').textContent = speaker.talk_title;
+        document.getElementById('m-abstract').textContent   = speaker.talk_abstract || 'Not provided.';
+        document.getElementById('m-email').innerHTML  = `<a class="detail-link" href="mailto:${escHtml(speaker.email)}">${escHtml(speaker.email)}</a>`;
+        document.getElementById('m-status-select').value = speaker.status;
+
+        const socialEl = document.getElementById('m-social');
+        if (speaker.social_link) {
+            socialEl.innerHTML = `<a class="detail-link" href="${escHtml(speaker.social_link)}" target="_blank" rel="noopener">${escHtml(speaker.social_link)}</a>`;
+        } else {
+            socialEl.textContent = '';
+        }
+
+        const submitted = new Date(speaker.created_at).toLocaleString('en-GB');
+        const updated   = new Date(speaker.updated_at).toLocaleString('en-GB');
+        document.getElementById('m-dates').textContent = `Submitted: ${submitted}  |  Last updated: ${updated}`;
+
+        const trelloEl = document.getElementById('m-trello-link');
+        if (speaker.trello_card_id) {
+            trelloEl.innerHTML = `<a class="detail-link" href="https://trello.com/c/${escHtml(speaker.trello_card_id)}" target="_blank" rel="noopener">View Trello card</a>`;
+        } else {
+            trelloEl.textContent = '';
+        }
+
+        document.getElementById('modal-overlay').classList.add('open');
+    }
+
+    function closeModal() {
+        document.getElementById('modal-overlay').classList.remove('open');
+        currentSpeaker = null;
+    }
+
+    function closeModalOnOverlay(e) {
+        if (e.target === document.getElementById('modal-overlay')) closeModal();
+    }
+
+    async function saveStatus() {
+        if (!currentSpeaker) return;
+        const newStatus = document.getElementById('m-status-select').value;
+
+        const { error } = await sb
+            .from('speakers')
+            .update({ status: newStatus })
+            .eq('id', currentSpeaker.id);
+
+        if (error) { alert('Error saving status: ' + error.message); return; }
+
+        currentSpeaker.status = newStatus;
+        const idx = allSpeakers.findIndex(s => s.id === currentSpeaker.id);
+        if (idx !== -1) allSpeakers[idx].status = newStatus;
+        updateStats();
+        renderCards();
+        closeModal();
+    }
+
+    // --- Utility ---
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+</script>
+</body>
+</html>
