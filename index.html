@@ -320,6 +320,14 @@
             });
 
             const data = await res.json();
+            if (res.status === 403) {
+                document.getElementById('form-content').style.display  = 'none';
+                document.getElementById('password-gate').style.display = 'block';
+                document.getElementById('gate-error').textContent      = 'Incorrect password. Please try again.';
+                document.getElementById('gate-error').style.display    = 'block';
+                document.getElementById('gate-password').value         = '';
+                return;
+            }
             if (!res.ok) throw new Error(data.error || 'Submission failed. Please try again.');
 
             msg.className     = 'message success';
